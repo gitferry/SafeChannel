@@ -8,21 +8,51 @@
 """
 import socket
 import threading
+from des import DES
 from docopt import docopt
 
+def handle_des(client_socket):
+    print "[*] The connection is encrypted with DES"
+    # waiting for key
+    print "[*] Waiting for key..."
+    try:
+        key_text = client_socket.recv(1024)
+        client_socket.send("Key received!")
+    except:
+        client_socket.close()
+        print "[*] Remote client is closed."
+        return
+
+    print "[*] Key accepted. Waiting for messages..."
+
+    while True:
+        try:
+            cipher_text = client_socket.recv(1024)
+
+            if cipher_text:
+                print "[*] Received: %s" % cipher_text
+                print "[*] Plain text is: %s" % DES.decrypt(cipher_text, key_text)
+
+            client_socket.send("ACK!")
+        except:
+            client_socket.close()
+            print "[*] Remote client is closed."
+            return
+
 def handle_client(client_socket):
-        while True:
-            try:
-                received_content = client_socket.recv(1024)
-
-                if received_content:
-                    print "[*] Received: %s" % received_content
-
-                client_socket.send("ACK!")
-            except:
-                client_socket.close()
-                print "[*] Remote client is closed."
-                return
+    # waiting for method
+    try:
+        received_content = client_socket.recv(1024)
+        client_socket.send("ACK")
+    except:
+        client_socket.close()
+        print "[*] Remote client is closed."
+        return 
+    if received_content == "method:des":
+        handle_des(client_socket)
+    else:
+        return
+    
 
 def create_server(args):
     bind_ip = "0.0.0.0"
@@ -55,6 +85,54 @@ def create_server(args):
             print "\n[*] Server is closed."
             return
 
+
+def des_method(client_socket):
+
+    # send methond message
+    method_message = "method:des"
+    try:
+        client_socket.send(method_message)
+        client_socket.recv(1024)
+    except:
+        client_socket.close()
+        print "\n[*] Connection is broke."
+        return
+
+    # send des key
+    print "[*] Please enter the key, and the length must longer than 8 characters."
+    while True:
+        key_text = raw_input("> ")
+        if len(key_text) > 8:
+            break
+        else:
+            print "[!] The length must longer than 8 characters.\
+                    Please try again:)."
+    try:
+        client_socket.send(key_text)
+        client_socket.recv(1024)
+    except:
+        client_socket.close()
+        print "\n[*] Connection is broke."
+        return
+
+    print "[*] Please enter the message:"
+    
+    # send encrypted message
+    while True:
+        try:
+            plain_text = raw_input('> ')
+            cipher_text = DES.encrypt(plain_text, key_text)
+            print "[*] The cipher is [%s]" % cipher_text
+            client_socket.send(cipher_text)
+            response_content = client_socket.recv(1024)
+
+            print response_content
+
+        except:
+            client_socket.close()
+            print "\n[*] Connection is broke."
+            return
+
     
 def create_client(args):
     print "Client created. The host is", args['<host>'], ":", args['<port>']
@@ -64,21 +142,13 @@ def create_client(args):
     target_port = int(args['<port>'])
 
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
     client_socket.connect((target_ip, target_port))
 
-    while True:
-        try:
-            message = raw_input('> ')
-            client_socket.send(message)
-            response_content = client_socket.recv(1024)
+    if args['<method>'] == "des":
+        des_method(client_socket)
+    else:
+        return
 
-            print response_content
-
-        except:
-            client_socket.close()
-            print "\n[*] Connection is broke."
-            return
 
 if __name__ == "__main__":
     arguments = docopt(__doc__, version='0.1.1rc')
