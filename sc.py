@@ -9,6 +9,7 @@
 import socket
 import threading
 from des import DES
+from rsa import rsa
 from docopt import docopt
 
 def handle_des(client_socket):
@@ -39,6 +40,47 @@ def handle_des(client_socket):
             print "[*] Remote client is closed."
             return
 
+def handle_rsa(client_socket):
+    print "[*] The connection is encrypted with RSA"
+    # generate keys
+    try:
+        prime_length = client_socket.recv(1024)
+    except:
+        client_socket.close()
+        print "[*] Remote client is closed."
+        return
+
+    prime_length = int(prime_length)
+    rsaKeys = rsa.RSAKey()
+    pub_key, priv_key = rsaKeys.gen_keys(prime_length)
+
+    # send public key
+    print "[*] Keys generated. Sending public key to the client..."
+    pub_key_string = str(pub_key[0]) + "," + str(pub_key[1])
+    try:
+        client_socket.send(pub_key_string)
+    except:
+        client_socket.close()
+        print "\n[*] Connection is broke."
+        return
+ 
+    print "[*] Public key sent. Waiting for messages..."
+
+    while True:
+        try:
+            cipher_text = client_socket.recv(5096)
+
+            if cipher_text:
+                print "[*] Received:\n%s" % cipher_text
+                print "[*] Plain text is: %s" % rsaKeys.decrypt(priv_key, cipher_text.split())
+
+            client_socket.send("ACK!")
+        except:
+            client_socket.close()
+            print "\n[*] Connection is broke."
+            return
+
+
 def handle_client(client_socket):
     # waiting for method
     try:
@@ -50,6 +92,8 @@ def handle_client(client_socket):
         return 
     if received_content == "method:des":
         handle_des(client_socket)
+    elif received_content == "method:rsa":
+        handle_rsa(client_socket)
     else:
         return
     
@@ -133,6 +177,46 @@ def des_method(client_socket):
             print "\n[*] Connection is broke."
             return
 
+def rsa_method(client_socket):
+
+    # Waiting for the public key
+    print "[*] Wating for the public key..."
+    method_message = "method:rsa"
+    client_socket.send(method_message)
+    client_socket.recv(1024)
+    
+    print "[*] Please enter the bit length of the prime."
+    bit_length = raw_input("> ")
+    try:
+        client_socket.send(bit_length)
+        pub_key_string = client_socket.recv(2048)
+        pub_key_array = pub_key_string.split(',')
+        pub_key = (long(pub_key_array[0]), long(pub_key_array[1]))
+    except:
+        client_socket.close()
+        print "\n[*] Connection is broke."
+        return
+
+    print "[*] Public key accepted."
+    print "[*] Please enter the message."
+
+    # send encrypted message
+    rsaKeys = rsa.RSAKey()
+    while True:
+        try:
+            plain_text = raw_input('> ')
+            cipher_text = rsaKeys.encrypt(pub_key, plain_text)
+            print "[*] The cipher is [%s]" % cipher_text
+            client_socket.send(cipher_text)
+            response_content = client_socket.recv(1024)
+
+            print response_content
+
+        except:
+            client_socket.close()
+            print "\n[*] Connection is broke."
+            return
+
     
 def create_client(args):
     print "Client created. The host is", args['<host>'], ":", args['<port>']
@@ -141,11 +225,17 @@ def create_client(args):
     target_ip = args['<host>']
     target_port = int(args['<port>'])
 
-    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.connect((target_ip, target_port))
+    try:
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((target_ip, target_port))
+    except:
+        print "[*] Server is not ready, please try again."
+        return
 
     if args['<method>'] == "des":
         des_method(client_socket)
+    elif args['<method>'] == "rsa":
+        rsa_method(client_socket)
     else:
         return
 
