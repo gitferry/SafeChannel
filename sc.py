@@ -11,6 +11,7 @@ import threading
 from des import DES
 from rsa import rsa
 from docopt import docopt
+from sha1 import sha1
 
 def handle_des(client_socket):
     print "[*] The connection is encrypted with DES"
@@ -80,6 +81,32 @@ def handle_rsa(client_socket):
             print "\n[*] Connection is broke."
             return
 
+def handle_sha1(client_socket):
+    print "[*] Wating for the message and digest..."
+    while True:
+        try:
+            message = client_socket.recv(2048)
+            print message
+            plain_text = message.split("+")[0]
+            digest_text = message.split("+")[1]
+
+            if digest_text and plain_text:
+                print "[*] Received message: %s" % plain_text
+                print "[*] Received digest: [%s]" % digest_text
+                sha1_degist = sha1.sha1(plain_text)
+
+                print "[*] Real digest: [%s]" % sha1_degist
+                if sha1_degist == digest_text:
+                    print "[*] The message is from correct client."
+                else:
+                    print"[*] The message was tampered."
+                
+            client_socket.send("ACK!")
+        except:
+            client_socket.close()
+            print "\n[*] Connection is broke."
+            return
+
 
 def handle_client(client_socket):
     # waiting for method
@@ -94,6 +121,8 @@ def handle_client(client_socket):
         handle_des(client_socket)
     elif received_content == "method:rsa":
         handle_rsa(client_socket)
+    elif received_content == "method:sha1":
+        handle_sha1(client_socket)
     else:
         return
     
@@ -217,6 +246,28 @@ def rsa_method(client_socket):
             print "\n[*] Connection is broke."
             return
 
+
+def sha1_method(client_socket):
+    # send method
+    method_message = "method:sha1"
+    client_socket.send(method_message)
+    client_socket.recv(1024)
+    
+    # send messages
+    print "[*] Please enter the message."
+    while True:
+        try:
+            plain_text = raw_input('> ')
+            digest_text = sha1.sha1(plain_text)
+            print "[*] The digest is [%s]" % digest_text
+            client_socket.send(plain_text + "+" + digest_text)
+            response_content = client_socket.recv(1024)
+
+            print response_content
+        except:
+            client_socket.close()
+            print "\n[*] Connection is broke."
+            return
     
 def create_client(args):
     print "Client created. The host is", args['<host>'], ":", args['<port>']
@@ -236,6 +287,8 @@ def create_client(args):
         des_method(client_socket)
     elif args['<method>'] == "rsa":
         rsa_method(client_socket)
+    elif args['<method>'] == "sha1":
+        sha1_method(client_socket)
     else:
         return
 
