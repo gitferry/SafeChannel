@@ -108,6 +108,38 @@ def handle_sha1(client_socket):
             return
 
 
+def handle_mix(client_socket):
+    # waiting for public key of the client
+    print "Wating for public key of the client"
+    try:
+        pub_key_string_client = client_socket.recv(2048)
+        pub_key_array_client = pub_key_string_client.split(',')
+        pub_key_client = (long(pub_key_array_client[0]), long(pub_key_array_client[1]))
+    except:
+        client_socket.close()
+        print "\n[*] Connection is broke."
+        return
+
+    print "[*] Client public key accepted."
+    print pub_key_client
+
+    prime_length = 512
+    rsaKeys = rsa.RSAKey()
+    pub_key_server, priv_key_server = rsaKeys.gen_keys(prime_length)
+
+    # send public key
+    print "[*] Keys generated. Sending public key to the client..."
+    pub_key_string_server = str(pub_key_server[0]) + "," + str(pub_key_server[1])
+    print pub_key_string_server
+    try:
+        client_socket.send(pub_key_string_server)
+    except:
+        client_socket.close()
+        print "\n[*] Connection is broke."
+        return
+ 
+
+
 def handle_client(client_socket):
     # waiting for method
     try:
@@ -123,6 +155,8 @@ def handle_client(client_socket):
         handle_rsa(client_socket)
     elif received_content == "method:sha1":
         handle_sha1(client_socket)
+    elif received_content == "method:mix":
+        handle_mix(client_socket) 
     else:
         return
     
@@ -268,6 +302,45 @@ def sha1_method(client_socket):
             client_socket.close()
             print "\n[*] Connection is broke."
             return
+
+
+def mix_method(client_socket):
+    # send method
+    method_message = "method:mix"
+    client_socket.send(method_message)
+    client_socket.recv(1024)
+
+    prime_length = 512
+    rsaKeys = rsa.RSAKey()
+    pub_key_client, priv_key_client = rsaKeys.gen_keys(prime_length)
+
+    # send public key
+    print "[*] RSA Keys generated. Sending public key to the server..."
+    pub_key_string_client = str(pub_key_client[0]) + "," + str(pub_key_client[1])
+    print pub_key_string_client
+    try:
+        client_socket.send(pub_key_string_client)
+    except:
+        client_socket.close()
+        print "\n[*] Connection is broke."
+        return
+ 
+    print "[*] Public key sent. Waiting for the server public key..."
+
+    # waiting for public key of the client
+    print "Wating for public key of the server"
+    try:
+        pub_key_string_server = client_socket.recv(2048)
+        pub_key_array_server = pub_key_string_server.split(',')
+        pub_key_server = (long(pub_key_array_server[0]), long(pub_key_array_server[1]))
+    except:
+        client_socket.close()
+        print "\n[*] Connection is broke."
+        return
+
+    print "[*] Server public key accepted."
+    print pub_key_server
+
     
 def create_client(args):
     print "Client created. The host is", args['<host>'], ":", args['<port>']
@@ -289,6 +362,8 @@ def create_client(args):
         rsa_method(client_socket)
     elif args['<method>'] == "sha1":
         sha1_method(client_socket)
+    elif args['<method>'] == "mix":
+        mix_method(client_socket)
     else:
         return
 
