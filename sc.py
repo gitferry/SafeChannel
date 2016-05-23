@@ -137,8 +137,43 @@ def handle_mix(client_socket):
         client_socket.close()
         print "\n[*] Connection is broke."
         return
- 
 
+    # waiting for des key
+    print "[*] Waiting for des key..."
+    cipher_des_key =  client_socket.recv(4096)
+    des_key = rsaKeys.decrypt(priv_key_server, cipher_des_key.split())
+    client_socket.send("Key received!")
+
+    # waiting for messages...
+    print "[*] Key accepted. Waiting for messages..."
+    while True:
+        try:
+            cipher_digest = client_socket.recv(102400)
+            print cipher_digest
+
+            if cipher_digest:
+                print "[*] Received cipher digest: %s" % cipher_digest
+                plain_digest = rsaKeys.decrypt(pub_key_client, cipher_digest.split())
+                print "[*] Plain digest is: %s" % plain_digest
+            client_socket.send("Digest Received!")
+            cipher_text = client_socket.recv(2048)
+            client_socket.send("Message Received!")
+            if cipher_text:
+                print "[*] Received cipher text: \n%s" % cipher_text
+                plain_text = DES.decrypt(cipher_text, des_key)
+                print "[*] Plain text is: \n %s" % DES.decrypt(cipher_text, des_key)
+                sha1_degist = sha1.sha1(plain_text)
+                print "[*] Real digest: [%s]" % sha1_degist
+                if sha1_degist == plain_digest:
+                    print "[*] The message is from correct client."
+                else:
+                    print"[*] The message was tampered."
+        except:
+            client_socket.close()
+            print "\n[*] Connection is broke."
+            return
+
+ 
 
 def handle_client(client_socket):
     # waiting for method
@@ -340,6 +375,45 @@ def mix_method(client_socket):
 
     print "[*] Server public key accepted."
     print pub_key_server
+
+    # generate des key
+    print "[*] Please enter des key, and the length must longer than 8 characters."
+    while True:
+        des_key = raw_input("> ")
+        if len(des_key) > 8:
+            break
+        else:
+            print "[!] The length must longer than 8 characters.\
+                    Please try again:)."
+
+    # encryte des key with server public key
+    rsaKeys = rsa.RSAKey()
+    try:
+        client_socket.send(rsaKeys.encrypt(pub_key_server, des_key))
+        print client_socket.recv(1024)
+    except:
+        client_socket.close()
+        print "\n[*] Connection is broke."
+        return
+
+    # send encrypted digest
+    print "[*] Please enter the message."
+    while True:
+        try:
+            plain_text = raw_input('> ')
+            digest_text = sha1.sha1(plain_text)
+            print "[*] The digest is [%s]" % digest_text
+            client_socket.send(rsaKeys.encrypt(priv_key_client, digest_text))
+            response_content = client_socket.recv(1024)
+            print response_content
+            cipher_text = DES.encrypt(plain_text, des_key)
+            client_socket.send(cipher_text)
+            response_content = client_socket.recv(1024)
+            print response_content
+        except:
+            client_socket.close()
+            print "\n[*] Connection is broke."
+            return
 
     
 def create_client(args):
