@@ -1,9 +1,9 @@
 # SafeChannel
 >
-Usage:
-  sc.py server <port>
-  sc.py client <host> <port> <method>
-  sc.py (-h | --help | --version)
+  Usage:
+    sc.py server <port>
+    sc.py client <host> <port> <method>
+    sc.py (-h | --help | --version)
   
   <method>
   des -- 单独使用des算法
