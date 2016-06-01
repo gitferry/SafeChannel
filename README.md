@@ -1,4 +1,9 @@
 # SafeChannel
+
+## Requirement
+
+    pip install docopt
+
 ## Usage:
     sc.py server <port>
   
