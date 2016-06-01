@@ -1,6 +1,6 @@
 # SafeChannel
-Usage:
-
+## Usage:
+>
   sc.py server <port>
   
   sc.py client <host> <port> <method>
@@ -16,3 +16,4 @@ Usage:
   sha1 -- 单独使用sha1算法
   
   mix -- 三种算法混合使用
+>
